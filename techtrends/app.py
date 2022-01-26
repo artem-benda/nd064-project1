@@ -141,12 +141,19 @@ def metrics():
 # start the application on port 3111
 if __name__ == "__main__":
     # stream logs to a file
-    logging.basicConfig(
-        filename='app.log',
-        level=logging.DEBUG,
-        format='%(levelname)s:%(module)s:%(funcName)s %(asctime)s.%(msecs)03d - %(message)s',
-        datefmt='%Y-%m-%d %H:%M:%S'
-    )
-    logging.getLogger().addHandler(logging.StreamHandler())
+    logFormatter = logging.Formatter("%(levelname)s:%(module)s:%(funcName)s %(asctime)s.%(msecs)03d - %(message)s")
+    rootLogger = logging.getLogger()
+
+    fileHandler = logging.FileHandler("app.log")
+    fileHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(fileHandler)
+
+    consoleHandler = logging.StreamHandler()
+    consoleHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(consoleHandler)
+    rootLogger.setLevel(logging.DEBUG)
 
     app.run(host='0.0.0.0', port='3111')
+
+
+
