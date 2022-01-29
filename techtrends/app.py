@@ -1,6 +1,7 @@
 import sqlite3
 import logging
 import threading
+import sys
 
 from flask import Flask, jsonify, json, render_template, request, url_for, redirect, flash
 from werkzeug.exceptions import abort
@@ -15,16 +16,11 @@ def inc_connections_counter():
         connections_counter += 1
 
 
-def dec_connections_counter():
-    global connections_counter
-    with threadLock:
-        connections_counter -= 1
-
-
 # Function to get a database connection.
 # This function connects to database with the name `database.db`
 def get_db_connection():
     connection = sqlite3.connect('database.db')
+    inc_connections_counter()
     connection.row_factory = sqlite3.Row
     return connection
 
@@ -32,21 +28,17 @@ def get_db_connection():
 # Function to get a post using its ID
 def get_post(post_id):
     connection = get_db_connection()
-    inc_connections_counter()
     post = connection.execute('SELECT * FROM posts WHERE id = ?',
                               (post_id,)).fetchone()
     connection.close()
-    dec_connections_counter()
     return post
 
 
 # Function to get a post using its ID
 def get_posts_count():
     connection = get_db_connection()
-    inc_connections_counter()
     posts_count = connection.execute('SELECT count(*) FROM posts').fetchone()[0]
     connection.close()
-    dec_connections_counter()
     return posts_count
 
 
@@ -59,10 +51,8 @@ app.config['SECRET_KEY'] = 'your secret key'
 @app.route('/')
 def index():
     connection = get_db_connection()
-    inc_connections_counter()
     posts = connection.execute('SELECT * FROM posts').fetchall()
     connection.close()
-    dec_connections_counter()
     app.logger.info('Root request successful, showing {} posts'.format(len(posts)))
     return render_template('index.html', posts=posts)
 
@@ -98,12 +88,10 @@ def create():
             flash('Title is required!')
         else:
             connection = get_db_connection()
-            inc_connections_counter()
             connection.execute('INSERT INTO posts (title, content) VALUES (?, ?)',
                                (title, content))
             connection.commit()
             connection.close()
-            dec_connections_counter()
 
             app.logger.info('New post [title={}] created successfully'.format(title))
             return redirect(url_for('index'))
@@ -144,13 +132,18 @@ if __name__ == "__main__":
     logFormatter = logging.Formatter("%(levelname)s:%(module)s:%(funcName)s %(asctime)s.%(msecs)03d - %(message)s")
     rootLogger = logging.getLogger()
 
-    fileHandler = logging.FileHandler("app.log")
-    fileHandler.setFormatter(logFormatter)
-    rootLogger.addHandler(fileHandler)
+    # fileHandler = logging.FileHandler("app.log")
+    # fileHandler.setFormatter(logFormatter)
+    # rootLogger.addHandler(fileHandler)
 
-    consoleHandler = logging.StreamHandler()
-    consoleHandler.setFormatter(logFormatter)
-    rootLogger.addHandler(consoleHandler)
+    consoleStdOutHandler = logging.StreamHandler(sys.stdout)
+    consoleStdOutHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(consoleStdOutHandler)
+	
+    consoleStdErrHandler = logging.StreamHandler(sys.stderr)
+    consoleStdErrHandler.setFormatter(logFormatter)
+    rootLogger.addHandler(consoleStdErrHandler)
+	
     rootLogger.setLevel(logging.DEBUG)
 
     app.run(host='0.0.0.0', port='3111')
